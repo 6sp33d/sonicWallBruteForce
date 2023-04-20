@@ -35,6 +35,8 @@ Options:
 
 -proxy         "HTTP proxy."
 
--delay         "how many seconds to wait before moving to next password in list."
+-passdelay     "how many seconds to wait before moving to next password in list."
 
--debug         "print extra stuffs."
+-userdelay     "how many seconds to wait before moving to next user in list."
+
+-debug         "print extra stuff"
