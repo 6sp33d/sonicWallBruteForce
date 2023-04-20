@@ -80,7 +80,7 @@ def make_form(p):
 def req_login_page():
     if proxy is None:
         resp = httpx.Client(http2=True, verify=False)
-        resp.get(LOGIN_PORTAL)
+        response = resp.get(LOGIN_PORTAL)
     else:
         resp = httpx.Client(http2=True, verify=False, proxies=proxies)
         response = resp.get(LOGIN_PORTAL)
@@ -110,7 +110,7 @@ def do_login():
     # Check if we're using a proxy (e.g. Burp)
     if proxy is None:
         login_req = httpx.Client(http2=True, verify=False)
-        login_req.post(AUTH_PAGE, data = form, cookies = cookies)
+        response = login_req.post(AUTH_PAGE, data = form, cookies = cookies)
 
     else:
         login_req = httpx.Client(http2=True, verify=False, proxies=proxies)
