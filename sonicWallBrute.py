@@ -76,7 +76,7 @@ def make_form(p):
 
 
 
-# This should be what sets up our class
+# This should be what sets up the class
 def req_login_page():
     if proxy is None:
         resp = httpx.Client(http2=True, verify=False)
@@ -96,8 +96,6 @@ def req_login_page():
     parser.feed(response.text)
 
     return parser
-
-
 
 
 
@@ -125,9 +123,6 @@ def do_login():
 
     # If we're here, the creds worked
     return True
-
-
-
 
 
 def main():
@@ -168,7 +163,7 @@ def main():
 
 
 
-    # Setup our proxy. Burp is a lovely choice. 
+    # Setup the proxy. Burp is a good choice. 
     if proxy != None:
         proxies = {
         "http://" : proxy,
@@ -187,7 +182,7 @@ def main():
     LOGOUT           = host + '/dynLoggedOut.html?didLogout=yes'
 
 
-    # Let's read in our user list
+    # Read in the user list
     global users
     userfile = open(userlist)
     try:
@@ -199,15 +194,13 @@ def main():
 
     # Let's figure out what we're doing for passwords
     if password is None and passwordlist is None:
-        print("You need a password list or a password set (-password or passwordlist). That should be obvious.")
+        print("[!] You need a password list or a password set (-password or -passwordlist)")
         sys.exit(-1)
     elif password is not None and passwordlist is not None:
-        print("You can only use a single password or a passwordlist, not both. Insert another quarter and try again.")
+        print("[!] You can only use a single password or a passwordlist, not both")
         sys.exit(-1)
 
-    # Ok, only one of our password options are set, perfect
-    # if it's just one password, we should be good already.
-    # if we're using a password list, we need to read that fun stuff in
+    # If password list is selected, read in password list
     global passwords
     if passwordlist is not None:
         passwordfile = open(passwordlist)
@@ -224,31 +217,38 @@ def main():
     global user
     for password in passwords:
         for user in users:
-            user     = user.strip('\n')
-            password = password.strip('\n')
+            try:
+                user     = user.strip('\n')
+                password = password.strip('\n')
 
-            if debug:
-                print("Trying (" + user + ":" + password + ")")
+                if debug:
+                    print("[i] Trying (" + user + ":" + password + ")")
 
-            if do_login():
-                print("Winner winner chicken dinner (" + user + ":" + password + ")")
-                sys.exit(0)
-            else:
-                print("Invalid credentials")
-                print("Failed - (" + user + ":" + password + ")")
+                if do_login():
+                    print("[+] Success!! (" + user + ":" + password + ")")
+                    sys.exit(0)
+                else:
+                    print("[-] Invalid credentials")
+                    print("[-] Failed - (" + user + ":" + password + ")")
 
-            if user_delay is not None:
-            # Should we wait between users to avoid lockouts/blocking?
-                print("Pausing before next user")
-                time.sleep(int(user_delay))
-                print("\n")
+                if user_delay is not None:
+                # Should we wait between users to avoid lockouts/blocking?
+                    print("[i] Pausing before next user")
+                    time.sleep(int(user_delay))
+                    print("\n")
+
+            # Error handling for random disconnects to prevent killing the entire script
+            except Exception as err:
+                print("\n\n[!] Pausing for 30 seconds due to some error\n\n")
+                time.sleep(30)
+                pass
 
         # Should we wait between password cycles to avoid lockouts/blocking?
         if pass_delay is not None:
-            print("Password loop done, waiting " + str(delay) + " seconds...")
+            print("[i] Password loop done, waiting " + str(pass_delay) + " seconds\n")
             time.sleep(int(pass_delay))
 
-    print("Done.")
+    print("[i] Done.")
 
 
 if __name__ == '__main__':
